@@ -9,6 +9,7 @@
 <br />
 
 [![Python](https://img.shields.io/badge/Python-3.7+-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![Node.js](https://img.shields.io/badge/Node.js-14+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](#license)
 [![Pincodes](https://img.shields.io/badge/Pincodes-19%2C586-orange.svg)](#dataset)
 [![Routing](https://img.shields.io/badge/Routing-OpenRouteService-7B68EE?logo=openstreetmap&logoColor=white)](https://openrouteservice.org/)
@@ -19,7 +20,7 @@
 <br />
 
 **Look up real driving distance and ETA between any two of India's 19,586 pincodes.**
-**No paid API. No `pip install`. No surprises.**
+**Python and Node.js, both zero-dependency. No paid API. No surprises.**
 
 <br />
 
@@ -83,10 +84,11 @@ This repo gives you a **free, scriptable, batch-friendly** alternative — fork 
 |---|---|
 | **Real road distance** | OpenRouteService Matrix API on the OpenStreetMap road network — not the straight-line guess |
 | **19,586 pincodes** | Every Indian pincode with valid coordinates from India Post |
+| **Python and Node.js** | Identical behavior in both runtimes — pick whichever fits your stack |
 | **Single + batch mode** | One pair from the CLI, or thousands from a CSV |
 | **20,000+ lookups/day, free** | Fits comfortably in the ORS free tier thanks to smart chunking |
-| **SQLite cache** | Symmetric — A->B and B->A share an entry. Re-runs are instant. |
-| **Zero dependencies** | Pure Python standard library. No `pip install`. |
+| **Symmetric cache** | SQLite (Python) or JSON (Node.js) — A->B and B->A share an entry |
+| **Zero dependencies** | Pure stdlib on both sides. No `pip install`, no `npm install`. |
 | **Self-hosting option** | Docker Compose for unlimited, offline OSRM (`./setup-osrm.sh` + `docker compose up`) |
 | **Configurable backend** | `BACKEND=ors` (default) or `BACKEND=osrm` via env var |
 | **Honest output** | Only road (transport) distance + ETA. No misleading aerial numbers. |
@@ -95,6 +97,8 @@ This repo gives you a **free, scriptable, batch-friendly** alternative — fork 
 ---
 
 ## Demo
+
+### Python
 
 ```
 $ python3 pincode_distance.py 560076 560103
@@ -110,17 +114,41 @@ Road distance (ORS)  : 13.42 km
 Estimated driving time : 32m
 ```
 
+### Node.js
+
+```
+$ node pincode_distance.js 560076 560103
+
+Loading pincode_data.csv ...
+Loaded 19,561 pincodes with valid coordinates.
+Backend: ORS
+
+From: 560076  Mico Layout S.O, BENGALURU URBAN, KARNATAKA
+To  : 560103  Bellandur S.O, BENGALURU URBAN, KARNATAKA
+
+Road distance (ORS)  : 13.42 km
+Estimated driving time   : 32m
+```
+
+The two implementations are functionally identical — pick whichever matches your stack.
+
 ---
 
 ## Quick Start
 
 ### Requirements
 
-- Python 3.7 or newer
+Pick **one** of:
+
+- **Python 3.7+** (uses only the standard library)
+- **Node.js 14+** (uses only built-in modules)
+
+Plus:
+
 - An internet connection (or run [self-hosted OSRM](#self-hosted-osrm))
 - A free OpenRouteService API key (~2 minutes to set up — see step 2)
 
-That's it. **No `pip install` is needed** — the script uses only the Python standard library.
+That's it. **No `pip install`, no `npm install`** — both implementations are zero-dependency.
 
 ### Step 1 — Fork and clone
 
@@ -210,8 +238,14 @@ If you outgrow the free tier:
 
 ### Step 3 — Run a lookup
 
+**Python:**
 ```bash
 python3 pincode_distance.py 560076 560103
+```
+
+**Node.js:**
+```bash
+node pincode_distance.js 560076 560103
 ```
 
 Done. You'll see the road distance and driving time printed in your terminal.
@@ -220,21 +254,27 @@ Done. You'll see the road distance and driving time printed in your terminal.
 
 ## Usage
 
+Both runtimes share the same CLI surface — every example below has a Python and a Node.js form.
+
 ### Single lookup
 
 ```bash
+# Python
 python3 pincode_distance.py <from_pincode> <to_pincode>
+
+# Node.js
+node pincode_distance.js <from_pincode> <to_pincode>
 ```
 
 **Examples:**
 
-| Command | Route |
-|---|---|
-| `python3 pincode_distance.py 110001 400001` | New Delhi -> Mumbai |
-| `python3 pincode_distance.py 110001 560001` | New Delhi -> Bangalore |
-| `python3 pincode_distance.py 700001 600001` | Kolkata -> Chennai |
-| `python3 pincode_distance.py 380001 411001` | Ahmedabad -> Pune |
-| `python3 pincode_distance.py 560076 560103` | Mico Layout -> Bellandur (Bengaluru) |
+| Route | Python | Node.js |
+|---|---|---|
+| New Delhi -> Mumbai | `python3 pincode_distance.py 110001 400001` | `node pincode_distance.js 110001 400001` |
+| New Delhi -> Bangalore | `python3 pincode_distance.py 110001 560001` | `node pincode_distance.js 110001 560001` |
+| Kolkata -> Chennai | `python3 pincode_distance.py 700001 600001` | `node pincode_distance.js 700001 600001` |
+| Ahmedabad -> Pune | `python3 pincode_distance.py 380001 411001` | `node pincode_distance.js 380001 411001` |
+| Mico Layout -> Bellandur (Bengaluru) | `python3 pincode_distance.py 560076 560103` | `node pincode_distance.js 560076 560103` |
 
 ### Batch lookup
 
@@ -251,7 +291,11 @@ from,to
 Then run:
 
 ```bash
+# Python
 python3 pincode_distance.py --batch sample_pairs.csv results.csv
+
+# Node.js
+node pincode_distance.js --batch sample_pairs.csv results.csv
 ```
 
 A working example file is included as [`sample_pairs.csv`](sample_pairs.csv).
@@ -296,17 +340,19 @@ Each ORS Matrix call carries up to 50 unique locations and returns the full N x 
 
 ## Configuration
 
-All configuration is via environment variables — no config file needed.
+All configuration is via environment variables — no config file needed. The same variables work for both the Python and Node.js scripts.
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `ORS_API_KEY` | *(required)* | Your OpenRouteService API key |
 | `BACKEND` | `ors` | Routing backend: `ors` or `osrm` |
 | `ORS_DELAY` | `1.6` | Seconds between ORS calls (40 calls/min limit) |
-| `CACHE_DB` | `.pincode_cache.sqlite` | Local cache file path |
+| `CACHE_DB` | `.pincode_cache.sqlite` (Python) / `.pincode_cache.json` (Node.js) | Local cache file path |
 | `PINCODE_CSV` | `pincode_data.csv` | Path to the dataset |
 | `OSRM_BASE` | public demo URL | OSRM endpoint when `BACKEND=osrm` |
 | `OSRM_DELAY` | `1.0` | Seconds between OSRM calls in batch mode |
+
+> The two runtimes use different cache file formats (SQLite vs JSON) but the behavior is identical — both are symmetric and keyed by backend.
 
 ---
 
@@ -387,9 +433,9 @@ export BACKEND=osrm
 export OSRM_BASE=http://localhost:5000/route/v1/driving
 export OSRM_DELAY=0
 
-# 4. Run unlimited lookups
+# 4. Run unlimited lookups (Python or Node.js - your choice)
 python3 pincode_distance.py 110001 400001
-python3 pincode_distance.py --batch sample_pairs.csv results.csv
+node pincode_distance.js --batch sample_pairs.csv results.csv
 ```
 
 ### Performance
@@ -539,11 +585,14 @@ Contributions are welcome — open an issue first if you're planning a big chang
 # Fork, then:
 git checkout -b feat/your-thing
 # make changes
-python3 pincode_distance.py 560076 560103   # smoke test
+python3 pincode_distance.py 560076 560103   # smoke test the Python version
+node pincode_distance.js 560076 560103      # smoke test the Node.js version
 git commit -am "feat: your thing"
 git push origin feat/your-thing
 # open a PR
 ```
+
+> If you change behavior, please keep the Python and Node.js implementations in sync — they're intentionally mirrors of each other.
 
 ---
 
@@ -571,7 +620,7 @@ git push origin feat/your-thing
 
 <br />
 
-Made with Python and OpenRouteService.
+Made with Python, Node.js, and OpenRouteService.
 
 [Back to top](#indian-pincode-distance-calculator)
 
