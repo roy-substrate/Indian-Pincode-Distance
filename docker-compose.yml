@@ -1,0 +1,38 @@
+version: "3.8"
+
+# Self-hosted OSRM server preloaded with the India OpenStreetMap extract.
+#
+# One-time setup (downloads ~900 MB of OSM data and preprocesses it; needs
+# ~8-16 GB RAM and ~30 minutes):
+#
+#     ./setup-osrm.sh
+#
+# Then start the server:
+#
+#     docker compose up -d
+#
+# And point the script at it:
+#
+#     export OSRM_BASE=http://localhost:5000/route/v1/driving
+#     export OSRM_DELAY=0
+#     python3 pincode_distance.py 110001 400001
+#
+# Stop with: docker compose down
+
+services:
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    container_name: osrm-india
+    command: >
+      osrm-routed --algorithm mld --max-table-size 5000
+      /data/india-latest.osrm
+    volumes:
+      - ./osrm-data:/data
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5000/route/v1/driving/77.2,28.6;72.8,18.9"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

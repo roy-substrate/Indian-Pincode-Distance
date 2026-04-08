@@ -4,12 +4,12 @@
 
 **Find the real road (driving) distance between any two Indian pincodes.**
 
-Powered by the official India Post pincode dataset and the OSRM routing engine.
+Powered by the official India Post pincode dataset and the OpenRouteService Matrix API.
 
 [![Python](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Dataset](https://img.shields.io/badge/pincodes-19%2C586-orange.svg)](#dataset)
-[![OSRM](https://img.shields.io/badge/routing-OSRM-red.svg)](https://project-osrm.org/)
+[![Routing](https://img.shields.io/badge/routing-OpenRouteService-blueviolet.svg)](https://openrouteservice.org/)
 
 </div>
 
@@ -19,18 +19,16 @@ Powered by the official India Post pincode dataset and the OSRM routing engine.
 
 Given two Indian pincodes, this tool returns:
 
-- **Road distance** (actual driving distance along roads) via OSRM
-- **Estimated driving time** (hours/minutes)
-- **Aerial distance** (straight-line haversine) for comparison
-- **Detour factor** (how much longer the road is vs. straight line)
+- **Road distance** — actual driving (transport) distance along roads
+- **Estimated driving time** — hours/minutes by car
 
-No API keys. No sign-up. Zero dependencies beyond the Python standard library.
+Built for **bulk use** — handles 20,000+ lookups per day on the **free** OpenRouteService tier, with automatic caching so re-runs are instant.
 
 ---
 
-## Quick start (3 steps)
+## Quick start (4 steps)
 
-### 1. Fork & clone
+### 1. Fork and clone
 
 Click the **Fork** button at the top-right of this repo, then:
 
@@ -39,25 +37,29 @@ git clone https://github.com/<your-username>/Indian-Pincode-Distance.git
 cd Indian-Pincode-Distance
 ```
 
-### 2. Make sure Python 3.7+ is installed
+### 2. Get a free OpenRouteService API key
+
+1. Sign up at [openrouteservice.org/dev/#/signup](https://openrouteservice.org/dev/#/signup) (free, no credit card)
+2. Verify your email
+3. Copy your API token from the dashboard
+
+The free tier gives you **500 matrix calls per day**, with up to **50 locations per call** — easily enough for tens of thousands of pincode pairs daily.
+
+### 3. Set the key
 
 ```bash
-python3 --version
+export ORS_API_KEY="your-key-here"
 ```
 
-That's it — no `pip install` needed. The script uses only the standard library.
+(On Windows PowerShell: `$env:ORS_API_KEY="your-key-here"`)
 
-### 3. Run the script
+### 4. Run the script
 
 ```bash
-python3 pincode_distance.py <from_pincode> <to_pincode>
+python3 pincode_distance.py 560076 560103
 ```
 
-**Example:** Delhi to Mumbai
-
-```bash
-python3 pincode_distance.py 110001 400001
-```
+That's it. No `pip install` — the script uses only the Python standard library.
 
 ---
 
@@ -66,14 +68,13 @@ python3 pincode_distance.py 110001 400001
 ```
 Loading pincode_data.csv ...
 Loaded 19,561 pincodes with valid coordinates.
+Backend: ORS
 
-From: 110001  Baroda House SO, NEW DELHI, DELHI  (28.61742, 77.21292)
-To  : 400001  MPT SO, MUMBAI, MAHARASHTRA  (18.93614, 72.83778)
+From: 560076  Mico Layout S.O, BENGALURU URBAN, KARNATAKA
+To  : 560103  Bellandur S.O, BENGALURU URBAN, KARNATAKA
 
-Aerial (haversine) distance : 1,164.61 km
-Road distance (OSRM)        : 1,416.23 km
-Estimated driving time      : 24h 31m
-Detour factor (road/aerial) : 1.22x
+Road distance (ORS)  : 13.42 km
+Estimated driving time : 32m
 ```
 
 ---
@@ -82,14 +83,114 @@ Detour factor (road/aerial) : 1.22x
 
 | From | To | Route |
 |---|---|---|
+| `110001` | `400001` | New Delhi -> Mumbai |
 | `110001` | `560001` | New Delhi -> Bangalore |
 | `700001` | `600001` | Kolkata -> Chennai |
 | `380001` | `411001` | Ahmedabad -> Pune |
-| `682001` | `695001` | Kochi -> Thiruvananthapuram |
+| `560076` | `560103` | Bengaluru (Mico Layout -> Bellandur) |
 
 ```bash
 python3 pincode_distance.py 700001 600001
 ```
+
+---
+
+## Bulk lookups (batch mode)
+
+Calculate thousands of distances in one shot. Prepare a CSV with `from,to`:
+
+```csv
+from,to
+110001,400001
+110001,560001
+700001,600001
+560076,560103
+```
+
+Then run:
+
+```bash
+python3 pincode_distance.py --batch sample_pairs.csv results.csv
+```
+
+The script will:
+
+1. Load all pincode coordinates
+2. Skip pairs already cached (instant)
+3. Group remaining pairs into ORS Matrix API calls (up to 50 locations per call)
+4. Cache every result so re-runs are free
+5. Write a results CSV
+
+### How 20,000 lookups stays in the free tier
+
+| | Free tier limit | Used for 20K pairs |
+|---|---|---|
+| Matrix calls / day | 500 | ~400 |
+| Locations per call | 50 | up to 50 |
+| Matrix calls / minute | 40 | rate-limited to ~37 by default |
+| Cost | $0 | **$0** |
+
+The script deduplicates locations within each chunk, so if many pairs share endpoints (e.g., one warehouse to many delivery pincodes) you'll use **far fewer** API calls.
+
+### Output CSV columns
+
+| Column | Description |
+|---|---|
+| `from`, `to` | Input pincodes |
+| `from_office`, `from_district`, `from_state` | Origin info from the dataset |
+| `to_office`, `to_district`, `to_state` | Destination info from the dataset |
+| `road_km` | Road (transport) distance from ORS |
+| `duration_min` | Estimated driving time in minutes |
+| `status` | `ok`, `ok_cached`, `missing_coords`, `no_route`, or `ors_error: ...` |
+
+---
+
+## Configuration
+
+All settings are environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ORS_API_KEY` | *(required)* | Your OpenRouteService API key |
+| `BACKEND` | `ors` | Routing backend: `ors` or `osrm` |
+| `ORS_DELAY` | `1.6` | Seconds between ORS calls (40 calls/min limit) |
+| `CACHE_DB` | `.pincode_cache.sqlite` | Local cache file path |
+| `PINCODE_CSV` | `pincode_data.csv` | Path to the dataset |
+| `OSRM_BASE` | public demo URL | OSRM endpoint when `BACKEND=osrm` |
+| `OSRM_DELAY` | `1.0` | Seconds between OSRM calls in batch mode |
+
+---
+
+## Alternative backend: OSRM
+
+If you'd rather use OSRM (no API key needed for the public demo, or self-host it for unlimited calls), set:
+
+```bash
+export BACKEND=osrm
+python3 pincode_distance.py 560076 560103
+```
+
+### Self-hosted OSRM (truly unlimited)
+
+For workloads beyond 20K/day, self-host OSRM with the included Docker setup. One-time preprocessing of the India OpenStreetMap extract takes ~30 min and ~8-16 GB RAM.
+
+```bash
+# 1. Download India OSM data + preprocess (one time)
+./setup-osrm.sh
+
+# 2. Start your local OSRM server
+docker compose up -d
+
+# 3. Point the script at it
+export BACKEND=osrm
+export OSRM_BASE=http://localhost:5000/route/v1/driving
+export OSRM_DELAY=0
+
+# 4. Run unlimited lookups
+python3 pincode_distance.py --batch sample_pairs.csv results.csv
+```
+
+20K lookups against your local OSRM take roughly 3-4 minutes.
 
 ---
 
@@ -126,62 +227,64 @@ The file `pincode_data.csv` is sourced from the official India Post dataset.
 ## How it works
 
 ```
-      +-----------------+        +------------------+        +--------------+
-      | pincode_data.csv| -----> | Build lat/long   | -----> |  OSRM API    |
-      |  (India Post)   |        | lookup per pin   |        | (road route) |
-      +-----------------+        +------------------+        +------+-------+
-                                                                     |
-                                                                     v
-                                                          +----------+---------+
-                                                          |  Distance + time   |
-                                                          |  + detour factor   |
-                                                          +--------------------+
+   +-----------------+      +------------------+      +---------------------+
+   | pincode_data.csv| ---> |  pincode -> lat/ | ---> |  ORS Matrix API     |
+   |  (India Post)   |      |  long lookup     |      |  (chunked, cached)  |
+   +-----------------+      +------------------+      +----------+----------+
+                                                                 |
+                                                                 v
+                                                       +---------+----------+
+                                                       |  road (transport)  |
+                                                       |  km + driving time |
+                                                       +--------------------+
 ```
 
-1. **`load_pincode_coords()`** — parses `pincode_data.csv` and builds a `{pincode: (lat, lon, office, district, state)}` map. Uses the **first valid** coordinate per pincode and skips rows with `NA`.
-2. **`haversine_km()`** — great-circle straight-line distance in km, used for the aerial comparison.
-3. **`osrm_route()`** — calls the public OSRM API at `https://router.project-osrm.org/route/v1/driving/lon,lat;lon,lat` and parses the response for distance (metres) and duration (seconds).
-4. **`main()`** — prints both distances, the estimated driving time, and the detour factor.
+1. **`load_pincode_coords()`** — parses `pincode_data.csv` and builds a `{pincode: (lat, lon, office, district, state)}` map. Uses the **first valid** row per pincode and skips `NA` rows.
+2. **`ors_matrix()`** — POSTs locations to `https://api.openrouteservice.org/v2/matrix/driving-car` and returns the road distance + duration matrix.
+3. **Batch chunking** — groups pairs so each ORS call carries up to 50 unique locations, deduplicating shared endpoints.
+4. **SQLite cache** — every result is keyed `(min(pin1,pin2), max(pin1,pin2), backend)` so symmetric and repeated lookups are free.
 
 ---
 
 ## FAQ
 
-**Q: Do I need a Google Maps API key?**
-No. This uses the free public OSRM demo — no key, no sign-up.
+**Q: Why OpenRouteService and not Google Maps?**
+ORS is free, requires no credit card, and has a generous matrix endpoint. Google Maps Distance Matrix charges per call after a small free trial.
 
-**Q: Is the road distance exact?**
-It's as accurate as OpenStreetMap road data for India. For most urban and highway routes it's within a few percent of Google Maps.
+**Q: How accurate is the road distance?**
+ORS uses the same OpenStreetMap road network as most open-source routers. For Indian highways and urban routes it's typically within a few percent of Google Maps.
 
 **Q: Why are some pincodes not found?**
-About 25 unique pincodes in the dataset have no valid coordinates (all their post-office rows are `NA`). Those can't be looked up.
-
-**Q: Can I use this for thousands of lookups?**
-The public OSRM demo is rate-limited. For heavy/batch use, self-host OSRM or switch to [OpenRouteService](https://openrouteservice.org/) / Google Maps Distance Matrix.
+About 25 unique pincodes in the dataset have no valid coordinates (all rows are `NA`). Those can't be looked up.
 
 **Q: Multiple post offices share one pincode — which location does it use?**
 The **first valid row** per pincode in the CSV. This is typically the head post office but may not be the geographic centroid.
+
+**Q: I hit my ORS daily quota — what now?**
+Either wait 24 hours, or switch to self-hosted OSRM (`export BACKEND=osrm` after running `setup-osrm.sh`). Cached results never re-call the API.
+
+**Q: Can I use this offline?**
+Yes — self-host OSRM with `setup-osrm.sh` + `docker compose up`, then everything runs on `localhost`.
 
 ---
 
 ## Limitations
 
-- Requires internet access (OSRM is an online API).
-- The OSRM public demo has rate limits — don't hammer it in a loop.
-- Straight-line detour factor assumes both points are reachable by road. Island pincodes (e.g., Andaman & Nicobar, Lakshadweep) may fail to route.
-- Post office coordinates are not always precise — rural BOs in particular may be off by a few km.
+- ORS free tier: 500 matrix calls/day, 40/min, 50 locations/call.
+- Island pincodes (Andaman & Nicobar, Lakshadweep) may fail to route.
+- Post-office coordinates are not always precise — rural BOs in particular may be off by a few km.
+- Cache file `.pincode_cache.sqlite` is local; share it across runs to save calls.
 
 ---
 
 ## Contributing
 
-Pull requests welcome. Ideas that would be nice to have:
+Pull requests welcome. Ideas:
 
-- [ ] Batch mode: read pairs from a CSV, write a result CSV
 - [ ] Simple Flask / FastAPI web UI
-- [ ] Caching of OSRM responses to avoid repeat calls
-- [ ] Fallback to OpenRouteService if OSRM is down
 - [ ] Nearest-pincode search (given a lat/long)
+- [ ] Bulk ETA-only mode for delivery planning
+- [ ] CSV input that takes office names instead of pincodes
 
 Open an issue or PR on [the repo](https://github.com/roy-substrate/indian-pincode-distance).
 
@@ -197,6 +300,6 @@ MIT. Dataset belongs to India Post; please check their terms before redistributi
 
 **If this helped you, please star the repo!**
 
-Built with Python and OSRM.
+Built with Python and OpenRouteService.
 
 </div>
